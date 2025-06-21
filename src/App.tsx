@@ -1,5 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
+import {
+  polarToCartesian,
+  describeArc,
+  calculateAngles,
+  calculateRotation,
+} from './utils/pie'
 
 interface Task {
   id: number
@@ -8,25 +14,22 @@ interface Task {
   effort: number
 }
 
-function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
-  return {
-    x: cx + r * Math.cos(angle),
-    y: cy + r * Math.sin(angle),
-  }
+function useIsMobile() {
+  const query = '(max-width: 600px)'
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window === 'undefined' ? false : window.matchMedia(query).matches,
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  return isMobile
 }
 
-function describeArc(
-  cx: number,
-  cy: number,
-  r: number,
-  startAngle: number,
-  endAngle: number,
-) {
-  const start = polarToCartesian(cx, cy, r, startAngle)
-  const end = polarToCartesian(cx, cy, r, endAngle)
-  const largeArcFlag = endAngle - startAngle <= Math.PI ? 0 : 1
-  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`
-}
 
 function PieChart({
   tasks,
@@ -37,11 +40,19 @@ function PieChart({
   selectedId: number | null
   onSelect: (id: number) => void
 }) {
+  const isMobile = useIsMobile()
+
   if (tasks.length === 0) {
     return <p>No tasks yet</p>
   }
 
   const r = 100
+  const angles = calculateAngles(tasks)
+  const selectedIndex = tasks.findIndex((t) => t.id === selectedId)
+  const rotation =
+    selectedIndex >= 0 ? calculateRotation(angles[selectedIndex].mid, isMobile) : 0
+  const rotationDeg = (rotation * 180) / Math.PI
+
   return (
     <svg
       className="pie"
@@ -49,27 +60,32 @@ function PieChart({
       width={220}
       height={220}
     >
-      {tasks.map((task, i) => {
-        const start = (i / tasks.length) * Math.PI * 2
-        const end = ((i + 1) / tasks.length) * Math.PI * 2
-        const mid = (start + end) / 2
-        const path = describeArc(0, 0, r, start, end)
-        const color = `hsl(${(i * 70) % 360},70%,50%)`
-        const textPos = polarToCartesian(0, 0, r * 0.6, mid)
-        return (
-          <g key={task.id} onClick={() => onSelect(task.id)}>
-            <path
-              d={path}
-              fill={color}
-              stroke="#000"
-              strokeWidth={selectedId === task.id ? 3 : 1}
-            />
-            <text x={textPos.x} y={textPos.y} textAnchor="middle">
-              {task.name}
-            </text>
-          </g>
-        )
-      })}
+      <g transform={`rotate(${rotationDeg})`}>
+        {tasks.map((task, i) => {
+          const { start, end, mid } = angles[i]
+          const path = describeArc(0, 0, r, start, end)
+          const color = `hsl(${(i * 70) % 360},70%,50%)`
+          const textPos = polarToCartesian(0, 0, r * 0.6, mid)
+          return (
+            <g key={task.id} onClick={() => onSelect(task.id)}>
+              <path
+                d={path}
+                fill={color}
+                stroke="#000"
+                strokeWidth={selectedId === task.id ? 3 : 1}
+              />
+              <text
+                x={textPos.x}
+                y={textPos.y}
+                textAnchor="middle"
+                transform={`rotate(${ -rotationDeg } ${textPos.x} ${textPos.y})`}
+              >
+                {task.name}
+              </text>
+            </g>
+          )
+        })}
+      </g>
     </svg>
   )
 }
