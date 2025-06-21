@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { polarToCartesian, calculateAngles, calculateRotation } from './pie'
+import {
+  polarToCartesian,
+  calculateAngles,
+  calculateRotation,
+  describeRingArc,
+} from './pie'
 
 describe('polarToCartesian', () => {
   it('converts polar coordinates to cartesian', () => {
@@ -37,5 +42,13 @@ describe('calculateRotation', () => {
   it('rotates for mobile', () => {
     const rot = calculateRotation(Math.PI / 4, true)
     expect(rot).toBeCloseTo(-Math.PI / 2 - Math.PI / 4)
+  })
+})
+
+describe('describeRingArc', () => {
+  it('creates an svg path for an annular sector', () => {
+    const path = describeRingArc(0, 0, 1, 2, 0, Math.PI)
+    expect(path.startsWith('M')).toBe(true)
+    expect(path.endsWith('Z')).toBe(true)
   })
 })

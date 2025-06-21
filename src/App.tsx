@@ -5,6 +5,7 @@ import Modal from './Modal'
 import {
   polarToCartesian,
   describeArc,
+  describeRingArc,
   calculateAngles,
   calculateRotation,
 } from './utils/pie'
@@ -19,6 +20,7 @@ interface Task {
   description: string
   effort: number
   completed: boolean
+  subtasks: Task[]
 }
 
 function useIsMobile() {
@@ -37,14 +39,69 @@ function useIsMobile() {
   return isMobile
 }
 
+function getTasksAtPath(tasks: Task[], path: number[]): Task[] {
+  let list = tasks
+  for (const id of path) {
+    const t = list.find((x) => x.id === id)
+    if (!t) return []
+    list = t.subtasks
+  }
+  return list
+}
+
+function getTaskByPath(tasks: Task[], path: number[]): Task | null {
+  let list = tasks
+  let current: Task | null = null
+  for (const id of path) {
+    current = list.find((x) => x.id === id) || null
+    if (!current) return null
+    list = current.subtasks
+  }
+  return current
+}
+
+function updateTaskAtPath(
+  tasks: Task[],
+  path: number[],
+  updater: (t: Task) => Task,
+): Task[] {
+  if (path.length === 0) return tasks
+  const [id, ...rest] = path
+  return tasks.map((t) => {
+    if (t.id !== id) return t
+    if (rest.length === 0) return updater(t)
+    return { ...t, subtasks: updateTaskAtPath(t.subtasks, rest, updater) }
+  })
+}
+
+function addTaskAtPath(tasks: Task[], path: number[], task: Task): Task[] {
+  if (path.length === 0) return [...tasks, task]
+  const [id, ...rest] = path
+  return tasks.map((t) => {
+    if (t.id !== id) return t
+    return { ...t, subtasks: addTaskAtPath(t.subtasks, rest, task) }
+  })
+}
+
+function deleteTaskAtPath(tasks: Task[], path: number[]): Task[] {
+  if (path.length === 1) return tasks.filter((t) => t.id !== path[0])
+  const [id, ...rest] = path
+  return tasks.map((t) => {
+    if (t.id !== id) return t
+    return { ...t, subtasks: deleteTaskAtPath(t.subtasks, rest) }
+  })
+}
+
 function PieChart({
   tasks,
-  selectedId,
+  path,
   onSelect,
+  onUp,
 }: {
   tasks: Task[]
-  selectedId: number | null
-  onSelect: (id: number) => void
+  path: number[]
+  onSelect: (p: number[]) => void
+  onUp: () => void
 }) {
   const isMobile = useIsMobile()
 
@@ -52,33 +109,50 @@ function PieChart({
     return <p>No tasks yet</p>
   }
 
-  const r = 100
-  const angles = calculateAngles(tasks)
-  const selectedIndex = tasks.findIndex((t) => t.id === selectedId)
+  const parentPath = path.slice(0, -1)
+  const currentTasks = getTasksAtPath(tasks, parentPath)
+  const selectedId = path[path.length - 1] ?? null
+  const angles = calculateAngles(currentTasks)
+  const selectedIndex = currentTasks.findIndex((t) => t.id === selectedId)
   const rotation =
     selectedIndex >= 0 ? calculateRotation(angles[selectedIndex].mid, isMobile) : 0
   const rotationDeg = (rotation * 180) / Math.PI
+  const selectedTask = selectedIndex >= 0 ? currentTasks[selectedIndex] : null
+  const childTasks = selectedTask ? selectedTask.subtasks : []
+  const childAngles = calculateAngles(childTasks)
+
+  const r1 = 70
+  const r2 = 100
+
+  const parentName = parentPath.length ? getTaskByPath(tasks, parentPath)?.name : ''
 
   return (
-    <svg
-      className="pie"
-      viewBox="-110 -110 220 220"
-      width={220}
-      height={220}
-    >
-      <g transform={`rotate(${rotationDeg})`}>
-        {tasks.map((task, i) => {
+    <svg className="pie" viewBox="-110 -110 220 220" width={220} height={220}>
+      <g className="parent" onClick={parentPath.length > 0 ? onUp : undefined}>
+        <circle cx={0} cy={0} r={r1 * 0.4} fill="#444" stroke="#000" />
+        {parentPath.length > 0 && (
+          <text x={0} y={0} textAnchor="middle" dominantBaseline="middle">
+            {parentName}
+          </text>
+        )}
+      </g>
+      <g transform={`rotate(${rotationDeg})`} className="current">
+        {currentTasks.map((task, i) => {
           const { start, end, mid } = angles[i]
-          const path = describeArc(0, 0, r, start, end)
+          const pathD = parentPath.length
+            ? describeRingArc(0, 0, r1 * 0.4, r1, start, end)
+            : describeArc(0, 0, r1, start, end)
           const color = task.completed ? '#006400' : '#555'
-          const textPos = polarToCartesian(0, 0, r * 0.6, mid)
+          const textRadius = parentPath.length ? (r1 + r1 * 0.4) / 2 : r1 * 0.6
+          const textPos = polarToCartesian(0, 0, textRadius, mid)
           return (
-            <g key={task.id} onClick={() => onSelect(task.id)}>
+            <g key={task.id} onClick={() => onSelect([...parentPath, task.id])}>
               <path
-                d={path}
+                d={pathD}
                 fill={color}
                 stroke="#000"
-                strokeWidth={selectedId === task.id ? 3 : 1}
+                strokeWidth={1}
+                className={task.id === selectedId ? 'selected' : undefined}
               />
               <text
                 x={textPos.x}
@@ -92,20 +166,47 @@ function PieChart({
           )
         })}
       </g>
+      {selectedTask && childTasks.length > 0 && (
+        <g transform={`rotate(${rotationDeg})`} className="children">
+          {childTasks.map((task, i) => {
+            const { start, end, mid } = childAngles[i]
+            const pathD = describeRingArc(0, 0, r1 + 5, r2, start, end)
+            const color = task.completed ? '#228b22' : '#777'
+            const textPos = polarToCartesian(0, 0, (r1 + r2) / 2, mid)
+            return (
+              <g key={task.id} onClick={() => onSelect([...path, task.id])}>
+                <path d={pathD} fill={color} stroke="#000" />
+                <text
+                  x={textPos.x}
+                  y={textPos.y}
+                  textAnchor="middle"
+                  transform={`rotate(${ -rotationDeg } ${textPos.x} ${textPos.y})`}
+                >
+                  {task.name}
+                </text>
+              </g>
+            )
+          })}
+        </g>
+      )}
     </svg>
   )
 }
 
+let nextId = 1
+
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [path, setPath] = useState<number[]>([])
   const [pendingName, setPendingName] = useState(false)
   const [pendingDesc, setPendingDesc] = useState(false)
   const [pendingEffort, setPendingEffort] = useState(false)
-  const [targetId, setTargetId] = useState<number | null>(null)
-  const [pendingAdd, setPendingAdd] = useState(false)
+  const [targetPath, setTargetPath] = useState<number[] | null>(null)
+  const [pendingAddPath, setPendingAddPath] = useState<number[] | null>(null)
   const [showUnsavedModal, setShowUnsavedModal] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmDeletePath, setConfirmDeletePath] = useState<number[] | null>(
+    null,
+  )
 
   const nameRef = useRef<EditableFieldHandle>(null)
   const descRef = useRef<EditableFieldHandle>(null)
@@ -113,45 +214,69 @@ export default function App() {
 
   const hasPending = pendingName || pendingDesc || pendingEffort
 
-  const createTask = () => {
-    const newTask: Task = {
-      id: Date.now(),
-      name: `New Task ${tasks.length + 1}`,
-      description: '',
-      effort: 100,
-      completed: false,
-    }
-    setTasks((prev) => [...prev, newTask])
-    setSelectedId(newTask.id)
+  const createTaskAtPath = (parent: number[]) => {
+    const id = nextId++
+    setTasks((prev) => {
+      const parentTask = getTaskByPath(prev, parent)
+      const index = parentTask ? parentTask.subtasks.length + 1 : prev.length + 1
+      const namePrefix = parent.length > 0 ? 'Subtask' : 'New Task'
+      const newTask: Task = {
+        id,
+        name: `${namePrefix} ${index}`,
+        description: '',
+        effort: 100,
+        completed: false,
+        subtasks: [],
+      }
+      return addTaskAtPath(prev, parent, newTask)
+    })
+    setPath([...parent, id])
   }
 
   const addTask = () => {
     if (hasPending) {
-      setPendingAdd(true)
+      setPendingAddPath([])
       setShowUnsavedModal(true)
     } else {
-      createTask()
+      createTaskAtPath([])
     }
   }
 
-  const updateTaskFields = (id: number, fields: Partial<Task>) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)))
-  }
-
-  const deleteTask = (id: number) => {
-    setTasks(tasks.filter((t) => t.id !== id))
-    if (selectedId === id) {
-      setSelectedId(null)
-    }
-  }
-
-  const handleSelect = (id: number) => {
-    if (id === selectedId) return
+  const addSubtask = () => {
     if (hasPending) {
-      setTargetId(id)
+      setPendingAddPath(path)
       setShowUnsavedModal(true)
     } else {
-      setSelectedId(id)
+      createTaskAtPath(path)
+    }
+  }
+
+  const addSibling = () => {
+    const parent = path.slice(0, -1)
+    if (hasPending) {
+      setPendingAddPath(parent)
+      setShowUnsavedModal(true)
+    } else {
+      createTaskAtPath(parent)
+    }
+  }
+
+  const updateTaskFields = (fields: Partial<Task>) => {
+    setTasks((prev) => updateTaskAtPath(prev, path, (t) => ({ ...t, ...fields })))
+  }
+
+  const deleteTask = () => {
+    setTasks((prev) => deleteTaskAtPath(prev, path))
+    setPath(path.slice(0, -1))
+  }
+
+  const handleSelect = (p: number[]) => {
+    if (p.join('/') === path.join('/')) return
+    if (hasPending) {
+      setTargetPath(p)
+      setShowUnsavedModal(true)
+    } else {
+      setPath(p)
     }
   }
 
@@ -160,13 +285,13 @@ export default function App() {
     descRef.current?.save()
     effortRef.current?.save()
     setShowUnsavedModal(false)
-    if (targetId !== null) {
-      setSelectedId(targetId)
-      setTargetId(null)
+    if (targetPath !== null) {
+      setPath(targetPath)
+      setTargetPath(null)
     }
-    if (pendingAdd) {
-      createTask()
-      setPendingAdd(false)
+    if (pendingAddPath !== null) {
+      createTaskAtPath(pendingAddPath)
+      setPendingAddPath(null)
     }
   }
 
@@ -175,17 +300,17 @@ export default function App() {
     descRef.current?.revert()
     effortRef.current?.revert()
     setShowUnsavedModal(false)
-    if (targetId !== null) {
-      setSelectedId(targetId)
-      setTargetId(null)
+    if (targetPath !== null) {
+      setPath(targetPath)
+      setTargetPath(null)
     }
-    if (pendingAdd) {
-      createTask()
-      setPendingAdd(false)
+    if (pendingAddPath !== null) {
+      createTaskAtPath(pendingAddPath)
+      setPendingAddPath(null)
     }
   }
 
-  const selected = tasks.find((t) => t.id === selectedId) || null
+  const selected = getTaskByPath(tasks, path)
 
   return (
     <div id="appRoot">
@@ -195,7 +320,12 @@ export default function App() {
       </div>
       <div className="split">
         <div className="task-picker">
-          <PieChart tasks={tasks} selectedId={selectedId} onSelect={handleSelect} />
+          <PieChart
+            tasks={tasks}
+            path={path}
+            onSelect={handleSelect}
+            onUp={() => setPath(path.slice(0, -1))}
+          />
         </div>
         <div className="task-details">
           {selected ? (
@@ -207,7 +337,7 @@ export default function App() {
                     ref={nameRef}
                     value={selected.name}
                     onDirtyChange={setPendingName}
-                    onSave={(v) => updateTaskFields(selected.id, { name: v as string })}
+                    onSave={(v) => updateTaskFields({ name: v as string })}
                   />
                 </label>
               </div>
@@ -220,7 +350,7 @@ export default function App() {
                     multiline
                     value={selected.description}
                     onDirtyChange={setPendingDesc}
-                    onSave={(v) => updateTaskFields(selected.id, { description: v as string })}
+                    onSave={(v) => updateTaskFields({ description: v as string })}
                   />
                 </label>
               </div>
@@ -233,9 +363,7 @@ export default function App() {
                     inputProps={{ min: 0 }}
                     value={selected.effort}
                     onDirtyChange={setPendingEffort}
-                    onSave={(v) =>
-                      updateTaskFields(selected.id, { effort: Number(v) })
-                    }
+                    onSave={(v) => updateTaskFields({ effort: Number(v) })}
                   />
                 </label>
               </div>
@@ -245,13 +373,15 @@ export default function App() {
                     type="checkbox"
                     checked={selected.completed}
                     onChange={(e) =>
-                      updateTaskFields(selected.id, { completed: e.target.checked })
+                      updateTaskFields({ completed: e.target.checked })
                     }
                   />{' '}
                   Completed
                 </label>
               </div>
-              <button type="button" onClick={() => setConfirmDeleteId(selected.id)}>
+              <button type="button" onClick={addSibling}>Add Sibling Task</button>
+              <button type="button" onClick={addSubtask}>Add Subtask</button>
+              <button type="button" onClick={() => setConfirmDeletePath(path)}>
                 Delete Task
               </button>
             </form>
@@ -270,22 +400,23 @@ export default function App() {
           </div>
         </Modal>
       )}
-      {confirmDeleteId !== null && (
-        <Modal onClose={() => setConfirmDeleteId(null)}>
+      {confirmDeletePath !== null && (
+        <Modal onClose={() => setConfirmDeletePath(null)}>
           <p>Delete this task?</p>
           <div className="modal-buttons">
             <button
               onClick={() => {
-                deleteTask(confirmDeleteId)
-                setConfirmDeleteId(null)
+                deleteTask()
+                setConfirmDeletePath(null)
               }}
             >
               Delete
             </button>
-            <button onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+            <button onClick={() => setConfirmDeletePath(null)}>Cancel</button>
           </div>
         </Modal>
       )}
     </div>
   )
 }
+

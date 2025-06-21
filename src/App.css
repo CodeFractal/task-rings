@@ -75,6 +75,11 @@
   pointer-events: none;
 }
 
+.pie path.selected {
+  stroke: yellow;
+  stroke-width: 3;
+}
+
 @media (max-width: 600px) {
   .split {
     flex-direction: column;
