@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import Modal from './Modal'
 import {
   polarToCartesian,
   describeArc,
@@ -93,6 +94,7 @@ function PieChart({
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const addTask = () => {
     const newTask: Task = {
@@ -163,7 +165,7 @@ export default function App() {
                   />
                 </label>
               </div>
-              <button type="button" onClick={() => deleteTask(selected.id)}>
+              <button type="button" onClick={() => setConfirmDeleteId(selected.id)}>
                 Delete Task
               </button>
             </form>
@@ -172,6 +174,22 @@ export default function App() {
           )}
         </div>
       </div>
+      {confirmDeleteId !== null && (
+        <Modal onClose={() => setConfirmDeleteId(null)}>
+          <p>Delete this task?</p>
+          <div className="modal-buttons">
+            <button
+              onClick={() => {
+                deleteTask(confirmDeleteId)
+                setConfirmDeleteId(null)
+              }}
+            >
+              Delete
+            </button>
+            <button onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
