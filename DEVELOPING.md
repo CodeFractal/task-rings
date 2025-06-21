@@ -14,11 +14,14 @@ Run `npm run deploy` to build and publish.
 Run `npm run build` to build the app.
 
 ### Publish
-1. Increment the patch version in the comment at the top of `index.html`.
+1. Increment the patch version in `index.html` by updating both the build
+   comment and the `meta[name="build-version"]` tag.
 2. Run `../publish` to publish the app to the live [GitHub Page](https://codefractal.github.io/task-rings).
    This is a binary that is maintained separately and lives outside of source control. Do not modify.
    It essentially just copies the `dist` folder to the `gh-pages` branch which is watched by GitHub Pages.
-   You'll need to wait 40 to 60 seconds for the changes to go live. You can verify your changes are live via the incremented version number you apply in the previous step.
+   You'll need to wait 40 to 60 seconds for the changes to go live. You can
+   verify your changes are live by checking the version number displayed in the
+   menu bar.
 
 ## Keeping Docs Up to Date
 If you make changes that affect setup or deployment, please update this file and the README so future developers stay informed.
