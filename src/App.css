@@ -42,3 +42,18 @@
   fill: #fff;
   pointer-events: none;
 }
+
+@media (max-width: 600px) {
+  .split {
+    flex-direction: column;
+    height: auto;
+  }
+  .task-details {
+    order: 1;
+  }
+  .task-picker {
+    order: 2;
+    border-right: none;
+    border-top: 1px solid #444;
+  }
+}
