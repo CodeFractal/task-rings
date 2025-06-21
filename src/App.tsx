@@ -8,6 +8,10 @@ import {
   calculateRotation,
 } from './utils/pie'
 
+const VERSION =
+  document.querySelector<HTMLMetaElement>('meta[name="build-version"]')?.content ||
+  '0.0.0'
+
 interface Task {
   id: number
   name: string
@@ -125,6 +129,7 @@ export default function App() {
   return (
     <div id="appRoot">
       <div className="menu-bar">
+        <span className="version">v{VERSION}</span>
         <button onClick={addTask}>+</button>
       </div>
       <div className="split">
