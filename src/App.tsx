@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import EditableField, { type EditableFieldHandle } from './EditableField'
 import './App.css'
 import Modal from './Modal'
 import {
@@ -35,7 +36,6 @@ function useIsMobile() {
 
   return isMobile
 }
-
 
 function PieChart({
   tasks,
@@ -99,9 +99,21 @@ function PieChart({
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [pendingName, setPendingName] = useState(false)
+  const [pendingDesc, setPendingDesc] = useState(false)
+  const [pendingEffort, setPendingEffort] = useState(false)
+  const [targetId, setTargetId] = useState<number | null>(null)
+  const [pendingAdd, setPendingAdd] = useState(false)
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
-  const addTask = () => {
+  const nameRef = useRef<EditableFieldHandle>(null)
+  const descRef = useRef<EditableFieldHandle>(null)
+  const effortRef = useRef<EditableFieldHandle>(null)
+
+  const hasPending = pendingName || pendingDesc || pendingEffort
+
+  const createTask = () => {
     const newTask: Task = {
       id: Date.now(),
       name: `New Task ${tasks.length + 1}`,
@@ -109,18 +121,67 @@ export default function App() {
       effort: 100,
       completed: false,
     }
-    setTasks([...tasks, newTask])
+    setTasks((prev) => [...prev, newTask])
     setSelectedId(newTask.id)
   }
 
-  const updateTask = (updated: Task) => {
-    setTasks(tasks.map((t) => (t.id === updated.id ? updated : t)))
+  const addTask = () => {
+    if (hasPending) {
+      setPendingAdd(true)
+      setShowUnsavedModal(true)
+    } else {
+      createTask()
+    }
+  }
+
+  const updateTaskFields = (id: number, fields: Partial<Task>) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...fields } : t)))
   }
 
   const deleteTask = (id: number) => {
     setTasks(tasks.filter((t) => t.id !== id))
     if (selectedId === id) {
       setSelectedId(null)
+    }
+  }
+
+  const handleSelect = (id: number) => {
+    if (id === selectedId) return
+    if (hasPending) {
+      setTargetId(id)
+      setShowUnsavedModal(true)
+    } else {
+      setSelectedId(id)
+    }
+  }
+
+  const saveAll = () => {
+    nameRef.current?.save()
+    descRef.current?.save()
+    effortRef.current?.save()
+    setShowUnsavedModal(false)
+    if (targetId !== null) {
+      setSelectedId(targetId)
+      setTargetId(null)
+    }
+    if (pendingAdd) {
+      createTask()
+      setPendingAdd(false)
+    }
+  }
+
+  const discardAll = () => {
+    nameRef.current?.revert()
+    descRef.current?.revert()
+    effortRef.current?.revert()
+    setShowUnsavedModal(false)
+    if (targetId !== null) {
+      setSelectedId(targetId)
+      setTargetId(null)
+    }
+    if (pendingAdd) {
+      createTask()
+      setPendingAdd(false)
     }
   }
 
@@ -134,7 +195,7 @@ export default function App() {
       </div>
       <div className="split">
         <div className="task-picker">
-          <PieChart tasks={tasks} selectedId={selectedId} onSelect={setSelectedId} />
+          <PieChart tasks={tasks} selectedId={selectedId} onSelect={handleSelect} />
         </div>
         <div className="task-details">
           {selected ? (
@@ -142,10 +203,11 @@ export default function App() {
               <div>
                 <label>
                   Name
-                  <input
-                    type="text"
+                  <EditableField
+                    ref={nameRef}
                     value={selected.name}
-                    onChange={(e) => updateTask({ ...selected, name: e.target.value })}
+                    onDirtyChange={setPendingName}
+                    onSave={(v) => updateTaskFields(selected.id, { name: v as string })}
                   />
                 </label>
               </div>
@@ -153,21 +215,26 @@ export default function App() {
                 <label>
                   Description
                   <br />
-                  <textarea
+                  <EditableField
+                    ref={descRef}
+                    multiline
                     value={selected.description}
-                    onChange={(e) => updateTask({ ...selected, description: e.target.value })}
+                    onDirtyChange={setPendingDesc}
+                    onSave={(v) => updateTaskFields(selected.id, { description: v as string })}
                   />
                 </label>
               </div>
               <div>
                 <label>
                   Effort
-                  <input
-                    type="number"
-                    min={0}
+                  <EditableField
+                    ref={effortRef}
+                    inputType="number"
+                    inputProps={{ min: 0 }}
                     value={selected.effort}
-                    onChange={(e) =>
-                      updateTask({ ...selected, effort: Number(e.target.value) })
+                    onDirtyChange={setPendingEffort}
+                    onSave={(v) =>
+                      updateTaskFields(selected.id, { effort: Number(v) })
                     }
                   />
                 </label>
@@ -178,7 +245,7 @@ export default function App() {
                     type="checkbox"
                     checked={selected.completed}
                     onChange={(e) =>
-                      updateTask({ ...selected, completed: e.target.checked })
+                      updateTaskFields(selected.id, { completed: e.target.checked })
                     }
                   />{' '}
                   Completed
@@ -193,6 +260,16 @@ export default function App() {
           )}
         </div>
       </div>
+      {showUnsavedModal && (
+        <Modal onClose={() => setShowUnsavedModal(false)}>
+          <p>You have unsaved changes.</p>
+          <div className="modal-buttons">
+            <button onClick={saveAll}>Save</button>
+            <button onClick={discardAll}>Discard</button>
+            <button onClick={() => setShowUnsavedModal(false)}>Cancel</button>
+          </div>
+        </Modal>
+      )}
       {confirmDeleteId !== null && (
         <Modal onClose={() => setConfirmDeleteId(null)}>
           <p>Delete this task?</p>
