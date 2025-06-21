@@ -28,6 +28,28 @@ export function describeArc(
   return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`
 }
 
+export function describeRingArc(
+  cx: number,
+  cy: number,
+  rInner: number,
+  rOuter: number,
+  startAngle: number,
+  endAngle: number,
+): string {
+  const outerStart = polarToCartesian(cx, cy, rOuter, startAngle)
+  const outerEnd = polarToCartesian(cx, cy, rOuter, endAngle)
+  const innerEnd = polarToCartesian(cx, cy, rInner, endAngle)
+  const innerStart = polarToCartesian(cx, cy, rInner, startAngle)
+  const largeArcFlag = endAngle - startAngle <= Math.PI ? 0 : 1
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${rOuter} ${rOuter} 0 ${largeArcFlag} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerEnd.x} ${innerEnd.y}`,
+    `A ${rInner} ${rInner} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
+    'Z',
+  ].join(' ')
+}
+
 export interface TaskLike {
   effort: number
 }

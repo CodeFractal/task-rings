@@ -7,3 +7,8 @@ A React web app built with Vite and TypeScript. The default styling uses a dark 
 The current build version is displayed in the app's top menu bar.
 
 For development setup, see [DEVELOPING.md](DEVELOPING.md).
+
+## Usage
+- Click a slice to focus on that task's subtasks.
+- Use the center ring to navigate back to the parent task.
+- Use **Add Sibling Task** to create a task under the same parent as the current selection.
