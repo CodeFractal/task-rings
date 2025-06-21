@@ -13,6 +13,7 @@ interface Task {
   name: string
   description: string
   effort: number
+  completed: boolean
 }
 
 function useIsMobile() {
@@ -65,7 +66,7 @@ function PieChart({
         {tasks.map((task, i) => {
           const { start, end, mid } = angles[i]
           const path = describeArc(0, 0, r, start, end)
-          const color = `hsl(${(i * 70) % 360},70%,50%)`
+          const color = task.completed ? '#006400' : '#555'
           const textPos = polarToCartesian(0, 0, r * 0.6, mid)
           return (
             <g key={task.id} onClick={() => onSelect(task.id)}>
@@ -102,6 +103,7 @@ export default function App() {
       name: `New Task ${tasks.length + 1}`,
       description: '',
       effort: 100,
+      completed: false,
     }
     setTasks([...tasks, newTask])
     setSelectedId(newTask.id)
@@ -163,6 +165,18 @@ export default function App() {
                       updateTask({ ...selected, effort: Number(e.target.value) })
                     }
                   />
+                </label>
+              </div>
+              <div>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selected.completed}
+                    onChange={(e) =>
+                      updateTask({ ...selected, completed: e.target.checked })
+                    }
+                  />{' '}
+                  Completed
                 </label>
               </div>
               <button type="button" onClick={() => setConfirmDeleteId(selected.id)}>
