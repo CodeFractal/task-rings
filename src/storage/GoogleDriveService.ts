@@ -1,5 +1,5 @@
-declare const gapi: any;
-declare const google: any;
+declare const gapi: any
+declare const google: any
 
 export class GoogleDriveService {
     private readonly CLIENT_ID = '834406545740-fpa6k2omak75t15u8ve4t7n0t3r1r0ig.apps.googleusercontent.com';
@@ -7,45 +7,43 @@ export class GoogleDriveService {
     private readonly DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
     private readonly SCOPES = 'https://www.googleapis.com/auth/drive';
 
-    private tokenClient: any = null;
-    private accessToken: AccessToken | null = null;
+    private tokenClient: any = null
+    private accessToken: AccessToken | null = null
+    private initPromise: Promise<void> | null = null
 
-    constructor() {
-        this.init();
-    }
+    constructor() {}
 
     /**
-     * Initializes the Google API client and token client.
+     * Loads Google API libraries and prepares the token client.
      */
-    private init(): void {
-        // Load the GAPI client.
-        gapi.load('client', () => {
-            gapi.client.init({
-                apiKey: this.API_KEY,
-                discoveryDocs: this.DISCOVERY_DOCS
-            }).then(() => {
-                console.log("GAPI client initialized.");
-            }).catch((error: any) => {
-                console.error("Error initializing GAPI client:", error);
-            });
-        });
-
-        // Initialize the token client using the Google Identity Services library.
-        // Note: Make sure the gsi/client script is loaded.
-        this.tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: this.CLIENT_ID,
-            scope: this.SCOPES,
-            callback: (response: any) => {
-                // Default callback if needed.
-                if (response.error) {
-                    console.error("Error during token acquisition:", response.error);
-                } 
-                else {
-                    this.accessToken = AccessToken.fromResponse(response);
-                    console.log("Access token acquired:", this.accessToken.token);
+    public init(): Promise<void> {
+        if (this.initPromise) return this.initPromise
+        this.initPromise = new Promise((resolve, reject) => {
+            const waitForGlobals = () => {
+                if (typeof gapi === 'undefined' || typeof google === 'undefined') {
+                    setTimeout(waitForGlobals, 50)
+                    return
                 }
+                gapi.load('client', async () => {
+                    try {
+                        await gapi.client.init({
+                            apiKey: this.API_KEY,
+                            discoveryDocs: this.DISCOVERY_DOCS,
+                        })
+                        this.tokenClient = google.accounts.oauth2.initTokenClient({
+                            client_id: this.CLIENT_ID,
+                            scope: this.SCOPES,
+                            callback: () => {},
+                        })
+                        resolve()
+                    } catch (err) {
+                        reject(err)
+                    }
+                })
             }
-        });
+            waitForGlobals()
+        })
+        return this.initPromise
     }
 
     /**
@@ -65,10 +63,11 @@ export class GoogleDriveService {
      * Prompts the user to sign in with their Google account.
      * Returns a promise that resolves to true if sign-in was successful, otherwise false.
      */
-    public signIn(): Promise<boolean> {
+    public async signIn(): Promise<boolean> {
+        await this.init()
         return new Promise((resolve, reject) => {
             if (!this.tokenClient) {
-                return reject(new Error("Token client not initialized."));
+                return reject(new Error('Token client not initialized.'))
             }
             // Temporarily override the callback for this sign-in attempt.
             const originalCallback = this.tokenClient.callback;
@@ -93,7 +92,8 @@ export class GoogleDriveService {
      * Continuously prompts the user to sign in with their Google account until successful.
      */
     private async getAccessTokenValidFor(seconds: number): Promise<AccessToken> {
-        const currentToken = this.accessToken || AccessToken.getExisting();
+        await this.init()
+        const currentToken = this.accessToken || AccessToken.getExisting()
         if (currentToken && !currentToken.expiresWithin(seconds)) {
             return currentToken;
         }
@@ -110,7 +110,8 @@ export class GoogleDriveService {
      * Returns a promise that resolves to the selected folder (an object with its ID)
      * or null if the user dismisses the modal.
      */
-    public pickFolder(): Promise<string | null> {
+    public async pickFolder(): Promise<string | null> {
+        await this.init()
         return new Promise((resolve) => {
             // Load the Picker API.
             gapi.load('picker', async () => {
@@ -145,10 +146,13 @@ export class GoogleDriveService {
      * Returns a promise that resolves to the selected file (an object with its ID)
      * or null if the user dismisses the modal.
      */
-    public pickFile(mimeTypes?: string | string[]): Promise<string | null> {
-        const mimeTypeString = Array.isArray(mimeTypes) ?
-            mimeTypes.length > 0 ? mimeTypes.join(',') : undefined :
-            mimeTypes;
+    public async pickFile(mimeTypes?: string | string[]): Promise<string | null> {
+        await this.init()
+        const mimeTypeString = Array.isArray(mimeTypes)
+            ? mimeTypes.length > 0
+                ? mimeTypes.join(',')
+                : undefined
+            : mimeTypes
 
         return new Promise<string | null>((resolve) => {
             // Load the Picker API.
@@ -190,7 +194,8 @@ export class GoogleDriveService {
      * @param content The content to be saved in the file
      * @returns The ID of the newly created file, or null if the file could not be created
      */
-    public saveAs(fileName: string, folderId: string, content: string, mimeType?: string): Promise<string | null> {
+    public async saveAs(fileName: string, folderId: string, content: string, mimeType?: string): Promise<string | null> {
+        await this.init()
         return new Promise(async (resolve) => {
             const file = new Blob([content], { type: mimeType });
             let metadata: any = {
@@ -226,9 +231,10 @@ export class GoogleDriveService {
      * @param fileId The ID of the file to be updated
      * @param content The content to be saved in the file
      */
-    public save(fileId: string, content: string, mimeType?: string): Promise<void> {
+    public async save(fileId: string, content: string, mimeType?: string): Promise<void> {
+        await this.init()
         return new Promise(async (resolve) => {
-            const accessToken = await this.getAccessTokenValidFor(20);
+            const accessToken = await this.getAccessTokenValidFor(20)
             fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                 method: 'PATCH',
                 headers: new Headers({
@@ -250,9 +256,10 @@ export class GoogleDriveService {
      * @param fileId The ID of the file to retrieve
      * @returns The content of the file, or null if the file could not be retrieved
      */
-    public open(fileId: string): Promise<string | null> {
+    public async open(fileId: string): Promise<string | null> {
+        await this.init()
         return new Promise(async (resolve) => {
-            const accessToken = await this.getAccessTokenValidFor(20);
+            const accessToken = await this.getAccessTokenValidFor(20)
             fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
                 headers: new Headers({ 'Authorization': 'Bearer ' + accessToken.token })
             })

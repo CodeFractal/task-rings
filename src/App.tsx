@@ -222,6 +222,7 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
+      await driveService.init()
       if (!driveService.tryAutoSignIn()) {
         const ok = await driveService.signIn()
         if (!ok) return
