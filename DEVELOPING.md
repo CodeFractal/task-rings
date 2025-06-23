@@ -10,6 +10,9 @@ Welcome! This guide helps new contributors get started and keep our documentatio
 Run `npm run deploy` to build and publish.
 *Note: this does not automatically increment the version number. See the **Publish** section for more details.*
 
+### Google Drive
+Saving is handled through Google Drive. The app loads the Google API and Identity scripts from Google's CDN (see `index.html`). During development you may be prompted to sign in when the app starts.
+
 ### Build
 Run `npm run build` to build the app.
 
