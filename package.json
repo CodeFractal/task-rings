@@ -8,8 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "../publish",
+    "publish": "../publish",
     "test": "vitest run"
   },
   "dependencies": {
