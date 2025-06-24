@@ -4,13 +4,14 @@ import { QueryStringHandler } from './storage/QueryStringHandler'
 import EditableField, { type EditableFieldHandle } from './EditableField'
 import './App.css'
 import Modal from './Modal'
+import { PieChart } from './PieChart'
 import {
-  polarToCartesian,
-  describeArc,
-  describeRingArc,
-  calculateAngles,
-  calculateRotation,
-} from './utils/pie'
+  getTaskByPath,
+  updateTaskAtPath,
+  addTaskAtPath,
+  deleteTaskAtPath,
+} from './utils/tasks'
+import type { Task } from './types'
 
 const VERSION =
   document.querySelector<HTMLMetaElement>('meta[name="build-version"]')?.content ||
@@ -19,184 +20,6 @@ const VERSION =
 const driveService = new GoogleDriveService()
 const queryHandler = new QueryStringHandler()
 
-interface Task {
-  id: number
-  name: string
-  description: string
-  effort: number
-  completed: boolean
-  subtasks: Task[]
-}
-
-function useIsMobile() {
-  const query = '(max-width: 600px)'
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window === 'undefined' ? false : window.matchMedia(query).matches,
-  )
-
-  useEffect(() => {
-    const mq = window.matchMedia(query)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
-
-  return isMobile
-}
-
-function getTasksAtPath(tasks: Task[], path: number[]): Task[] {
-  let list = tasks
-  for (const id of path) {
-    const t = list.find((x) => x.id === id)
-    if (!t) return []
-    list = t.subtasks
-  }
-  return list
-}
-
-function getTaskByPath(tasks: Task[], path: number[]): Task | null {
-  let list = tasks
-  let current: Task | null = null
-  for (const id of path) {
-    current = list.find((x) => x.id === id) || null
-    if (!current) return null
-    list = current.subtasks
-  }
-  return current
-}
-
-function updateTaskAtPath(
-  tasks: Task[],
-  path: number[],
-  updater: (t: Task) => Task,
-): Task[] {
-  if (path.length === 0) return tasks
-  const [id, ...rest] = path
-  return tasks.map((t) => {
-    if (t.id !== id) return t
-    if (rest.length === 0) return updater(t)
-    return { ...t, subtasks: updateTaskAtPath(t.subtasks, rest, updater) }
-  })
-}
-
-function addTaskAtPath(tasks: Task[], path: number[], task: Task): Task[] {
-  if (path.length === 0) return [...tasks, task]
-  const [id, ...rest] = path
-  return tasks.map((t) => {
-    if (t.id !== id) return t
-    return { ...t, subtasks: addTaskAtPath(t.subtasks, rest, task) }
-  })
-}
-
-function deleteTaskAtPath(tasks: Task[], path: number[]): Task[] {
-  if (path.length === 1) return tasks.filter((t) => t.id !== path[0])
-  const [id, ...rest] = path
-  return tasks.map((t) => {
-    if (t.id !== id) return t
-    return { ...t, subtasks: deleteTaskAtPath(t.subtasks, rest) }
-  })
-}
-
-function PieChart({
-  tasks,
-  path,
-  onSelect,
-  onUp,
-}: {
-  tasks: Task[]
-  path: number[]
-  onSelect: (p: number[]) => void
-  onUp: () => void
-}) {
-  const isMobile = useIsMobile()
-
-  if (tasks.length === 0) {
-    return <p>No tasks yet</p>
-  }
-
-  const parentPath = path.slice(0, -1)
-  const currentTasks = getTasksAtPath(tasks, parentPath)
-  const selectedId = path[path.length - 1] ?? null
-  const angles = calculateAngles(currentTasks)
-  const selectedIndex = currentTasks.findIndex((t) => t.id === selectedId)
-  const rotation =
-    selectedIndex >= 0 ? calculateRotation(angles[selectedIndex].mid, isMobile) : 0
-  const rotationDeg = (rotation * 180) / Math.PI
-  const selectedTask = selectedIndex >= 0 ? currentTasks[selectedIndex] : null
-  const childTasks = selectedTask ? selectedTask.subtasks : []
-  const childAngles = calculateAngles(childTasks)
-
-  const r1 = 70
-  const r2 = 100
-
-  const parentName = parentPath.length ? getTaskByPath(tasks, parentPath)?.name : ''
-
-  return (
-    <svg className="pie" viewBox="-110 -110 220 220" width={220} height={220}>
-      <g className="parent" onClick={parentPath.length > 0 ? onUp : undefined}>
-        <circle cx={0} cy={0} r={r1 * 0.4} fill="#444" stroke="#000" />
-        {parentPath.length > 0 && (
-          <text x={0} y={0} textAnchor="middle" dominantBaseline="middle">
-            {parentName}
-          </text>
-        )}
-      </g>
-      <g transform={`rotate(${rotationDeg})`} className="current">
-        {currentTasks.map((task, i) => {
-          const { start, end, mid } = angles[i]
-          const pathD = parentPath.length
-            ? describeRingArc(0, 0, r1 * 0.4, r1, start, end)
-            : describeArc(0, 0, r1, start, end)
-          const color = task.completed ? '#006400' : '#555'
-          const textRadius = parentPath.length ? (r1 + r1 * 0.4) / 2 : r1 * 0.6
-          const textPos = polarToCartesian(0, 0, textRadius, mid)
-          return (
-            <g key={task.id} onClick={() => onSelect([...parentPath, task.id])}>
-              <path
-                d={pathD}
-                fill={color}
-                stroke="#000"
-                strokeWidth={1}
-                className={task.id === selectedId ? 'selected' : undefined}
-              />
-              <text
-                x={textPos.x}
-                y={textPos.y}
-                textAnchor="middle"
-                transform={`rotate(${ -rotationDeg } ${textPos.x} ${textPos.y})`}
-              >
-                {task.name}
-              </text>
-            </g>
-          )
-        })}
-      </g>
-      {selectedTask && childTasks.length > 0 && (
-        <g transform={`rotate(${rotationDeg})`} className="children">
-          {childTasks.map((task, i) => {
-            const { start, end, mid } = childAngles[i]
-            const pathD = describeRingArc(0, 0, r1 + 5, r2, start, end)
-            const color = task.completed ? '#228b22' : '#777'
-            const textPos = polarToCartesian(0, 0, (r1 + r2) / 2, mid)
-            return (
-              <g key={task.id} onClick={() => onSelect([...path, task.id])}>
-                <path d={pathD} fill={color} stroke="#000" />
-                <text
-                  x={textPos.x}
-                  y={textPos.y}
-                  textAnchor="middle"
-                  transform={`rotate(${ -rotationDeg } ${textPos.x} ${textPos.y})`}
-                >
-                  {task.name}
-                </text>
-              </g>
-            )
-          })}
-        </g>
-      )}
-    </svg>
-  )
-}
 
 let nextId = 1
 
