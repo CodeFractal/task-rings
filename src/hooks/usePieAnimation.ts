@@ -27,6 +27,17 @@ export interface AnimatedLayers {
     rotationDeg: number
     opacity: number
   }
+  prevParent?: {
+    radius: number
+    opacity: number
+  }
+  fadingChild?: {
+    tasks: Task[]
+    angles: AngleInfo[]
+    radii: Radii
+    rotationDeg: number
+    opacity: number
+  }
 }
 
 export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
@@ -45,6 +56,9 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
       ? (calculateRotation(prevAngles[prevSelectedIndex].mid, isMobile) * 180) /
         Math.PI
       : 0
+  const prevSelectedTask = prevSelectedIndex >= 0 ? prevTasks[prevSelectedIndex] : null
+  const prevChildTasks = prevSelectedTask ? prevSelectedTask.subtasks : []
+  const prevChildAngles = calculateAngles(prevChildTasks)
 
   const parentPath = path.slice(0, -1)
   const currentTasks = getTasksAtPath(tasks, parentPath)
@@ -70,6 +84,9 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   let fromChild: Radii | undefined
   let fromPrev: Radii | undefined
   let targetPrev: Radii = { inner: 0, outer: 0 }
+  let prevParentFrom: number | undefined
+  let prevChildFrom: Radii | undefined
+  let prevChildTo: Radii | undefined
 
   if (depthDiff > 0) {
     fromParent = r1
@@ -79,16 +96,21 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
     targetPrev = { inner: 0, outer: naturalParent }
   } else if (depthDiff < 0) {
     fromParent = 0
-    fromCurrent = { inner: 0, outer: naturalParent }
+    fromCurrent = { inner: naturalParent, outer: naturalParent }
     fromChild = { inner: naturalParent, outer: r1 }
+    prevParentFrom = naturalParent
+    prevChildFrom = { inner: r1 + 5, outer: r2 }
+    prevChildTo = { inner: r2 + 5, outer: r2 + 10 }
   }
 
   const parentRadius = useAnimatedNumber(targetParent, 1500, fromParent)
   const current = useAnimatedRadii(targetCurrent, 1500, fromCurrent)
   const child = useAnimatedRadii(targetChild, 1500, fromChild)
   const prevRadii = useAnimatedRadii(targetPrev, 1500, fromPrev)
+  const prevParentRadius = useAnimatedNumber(r1, 1500, prevParentFrom)
+  const prevChildRadii = useAnimatedRadii(prevChildTo ?? { inner: 0, outer: 0 }, 1500, prevChildFrom)
 
-  const parentOpacity = depthDiff > 0 ? fade : depthDiff < 0 ? 1 - fade : 1
+  const parentOpacity = depthDiff !== 0 ? fade : 1
   const prev: AnimatedLayers['prev'] = depthDiff > 0
     ? {
         tasks: prevTasks,
@@ -98,6 +120,29 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
         opacity: 1 - fade,
       }
     : undefined
+  const prevParent =
+    depthDiff < 0 && prevParentFrom !== undefined
+      ? { radius: prevParentRadius, opacity: 1 - fade }
+      : undefined
+  const fadingChild =
+    depthDiff < 0 && prevChildFrom
+      ? {
+          tasks: prevChildTasks,
+          angles: prevChildAngles,
+          radii: prevChildRadii,
+          rotationDeg: prevRotationDeg,
+          opacity: 1 - fade,
+        }
+      : undefined
 
-  return { rotationDeg, parentRadius, parentOpacity, current, child, prev }
+  return {
+    rotationDeg,
+    parentRadius,
+    parentOpacity,
+    current,
+    child,
+    prev,
+    prevParent,
+    fadingChild,
+  }
 }

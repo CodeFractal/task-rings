@@ -18,6 +18,8 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
     current,
     child,
     prev,
+    prevParent,
+    fadingChild,
   } = usePieAnimation(tasks, path)
 
   const parentPath = path.slice(0, -1)
@@ -43,6 +45,16 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
           </text>
         )}
       </g>
+      {prevParent && (
+        <circle
+          cx={0}
+          cy={0}
+          r={prevParent.radius}
+          fill="#444"
+          stroke="#000"
+          style={{ opacity: prevParent.opacity }}
+        />
+      )}
       {prev && (
         <g transform={`rotate(${prev.rotationDeg})`} style={{ opacity: prev.opacity }}>
           {prev.tasks.map((task, i) => {
@@ -101,6 +113,16 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
                 </text>
               </g>
             )
+          })}
+        </g>
+      )}
+      {fadingChild && (
+        <g transform={`rotate(${fadingChild.rotationDeg})`} style={{ opacity: fadingChild.opacity }}>
+          {fadingChild.tasks.map((task, i) => {
+            const { start, end } = fadingChild.angles[i]
+            const d = describeRingArc(0, 0, fadingChild.radii.inner, fadingChild.radii.outer, start, end)
+            const color = task.completed ? '#228b22' : '#777'
+            return <path key={task.id} d={d} fill={color} stroke="#000" />
           })}
         </g>
       )}
