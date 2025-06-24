@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 
 export function lerp(from: number, to: number, t: number): number {
   return from + (to - from) * t
@@ -73,12 +73,19 @@ export function useRevealOnChange(
 ): number {
   const [progress, setProgress] = useState(1)
   const frameRef = useRef<number | undefined>(undefined)
+  const prevRef = useRef(trigger)
+
+  useLayoutEffect(() => {
+    if (prevRef.current !== trigger) {
+      prevRef.current = trigger
+      setProgress(0)
+    }
+  }, [trigger])
 
   useEffect(() => {
     if (frameRef.current !== undefined) {
       cancelAnimationFrame(frameRef.current)
     }
-    setProgress(0)
     const start = performance.now()
 
     const step = () => {
