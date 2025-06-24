@@ -4,6 +4,10 @@ export function lerp(from: number, to: number, t: number): number {
   return from + (to - from) * t
 }
 
+export function easeInOut(t: number): number {
+  return (1 - Math.cos(Math.PI * t)) / 2
+}
+
 export interface Radii {
   inner: number
   outer: number
@@ -16,13 +20,23 @@ export function interpolateRadii(from: Radii, to: Radii, t: number): Radii {
   }
 }
 
-export function useAnimatedRadii(value: Radii, duration: number, from?: Radii): Radii {
-  const inner = useAnimatedNumber(value.inner, duration, from?.inner)
-  const outer = useAnimatedNumber(value.outer, duration, from?.outer)
+export function useAnimatedRadii(
+  value: Radii,
+  duration: number,
+  from?: Radii,
+  easing: (t: number) => number = easeInOut,
+): Radii {
+  const inner = useAnimatedNumber(value.inner, duration, from?.inner, easing)
+  const outer = useAnimatedNumber(value.outer, duration, from?.outer, easing)
   return { inner, outer }
 }
 
-export function useAnimatedNumber(value: number, duration: number, from?: number): number {
+export function useAnimatedNumber(
+  value: number,
+  duration: number,
+  from?: number,
+  easing: (t: number) => number = easeInOut,
+): number {
   const [animated, setAnimated] = useState(from ?? value)
   const frameRef = useRef<number | undefined>(undefined)
   const startRef = useRef(from ?? value)
@@ -33,7 +47,7 @@ export function useAnimatedNumber(value: number, duration: number, from?: number
 
     const step = () => {
       const t = Math.min((performance.now() - start) / duration, 1)
-      setAnimated(lerp(startRef.current, value, t))
+      setAnimated(lerp(startRef.current, value, easing(t)))
       if (t < 1) {
         frameRef.current = requestAnimationFrame(step)
       }
@@ -47,12 +61,16 @@ export function useAnimatedNumber(value: number, duration: number, from?: number
     }
     // We intentionally omit animated from deps to start from the last value
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, duration, from])
+  }, [value, duration, from, easing])
 
   return animated
 }
 
-export function useRevealOnChange(trigger: any, duration: number): number {
+export function useRevealOnChange(
+  trigger: any,
+  duration: number,
+  easing: (t: number) => number = easeInOut,
+): number {
   const [progress, setProgress] = useState(1)
   const frameRef = useRef<number | undefined>(undefined)
 
@@ -65,7 +83,7 @@ export function useRevealOnChange(trigger: any, duration: number): number {
 
     const step = () => {
       const t = Math.min((performance.now() - start) / duration, 1)
-      setProgress(t)
+      setProgress(easing(t))
       if (t < 1) {
         frameRef.current = requestAnimationFrame(step)
       }
@@ -77,7 +95,7 @@ export function useRevealOnChange(trigger: any, duration: number): number {
         cancelAnimationFrame(frameRef.current)
       }
     }
-  }, [trigger, duration])
+  }, [trigger, duration, easing])
 
   return progress
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lerp, interpolateRadii } from './animation'
+import { lerp, interpolateRadii, easeInOut } from './animation'
 
 describe('lerp', () => {
   it('interpolates between numbers', () => {
@@ -18,5 +18,13 @@ describe('interpolateRadii', () => {
     expect(mid.inner).toBeCloseTo(2.5)
     expect(mid.outer).toBeCloseTo(15)
     expect(interpolateRadii(from, to, 1)).toEqual({ inner: 5, outer: 20 })
+  })
+})
+
+describe('easeInOut', () => {
+  it('eases from 0 to 1 symmetrically', () => {
+    expect(easeInOut(0)).toBe(0)
+    expect(easeInOut(0.5)).toBeCloseTo(0.5)
+    expect(easeInOut(1)).toBe(1)
   })
 })

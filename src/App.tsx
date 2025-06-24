@@ -117,6 +117,7 @@ function PieChart({
   const layerFade = useRevealOnChange(path.join('/'), 1500)
   const prevPath = usePrevious(path) || path
   const depthDiff = path.length - prevPath.length
+  const parentFadeRaw = useRevealOnChange(path.length, 1500)
 
   const parentPath = path.slice(0, -1)
   const currentTasks = getTasksAtPath(tasks, parentPath)
@@ -135,8 +136,8 @@ function PieChart({
   const r2 = 100
   const parentRadius = r1 * 0.4
 
-  const targetParent = parentPath.length > 0 ? parentRadius : 0
-  const targetCurrent = { inner: parentPath.length > 0 ? parentRadius : 0, outer: r1 }
+  const targetParent = path.length > 0 ? parentRadius : 0
+  const targetCurrent = { inner: path.length > 0 ? parentRadius : 0, outer: r1 }
   const targetChild = { inner: r1 + 5, outer: r2 }
 
   let fromParent: number | undefined
@@ -161,6 +162,8 @@ function PieChart({
 
   const animatedParentRadius = useAnimatedNumber(targetParent, 1500, fromParent)
 
+  const parentOpacity = depthDiff > 0 ? parentFadeRaw : depthDiff < 0 ? 1 - parentFadeRaw : 1
+
   if (tasks.length === 0) {
     return <p>No tasks yet</p>
   }
@@ -169,7 +172,11 @@ function PieChart({
 
   return (
     <svg className="pie" viewBox="-110 -110 220 220" width={220} height={220}>
-      <g className="parent" onClick={parentPath.length > 0 ? onUp : undefined}>
+      <g
+        className="parent"
+        onClick={parentPath.length > 0 ? onUp : undefined}
+        style={{ opacity: parentOpacity }}
+      >
         <circle cx={0} cy={0} r={animatedParentRadius} fill="#444" stroke="#000" />
         {parentPath.length > 0 && (
           <text x={0} y={0} textAnchor="middle" dominantBaseline="middle">
