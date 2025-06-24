@@ -114,7 +114,6 @@ function PieChart({
   onUp: () => void
 }) {
   const isMobile = useIsMobile()
-  const layerFade = useRevealOnChange(path.join('/'), 1500)
   const prevPath = usePrevious(path) || path
   const depthDiff = path.length - prevPath.length
   const parentFadeRaw = useRevealOnChange(path.length, 1500)
@@ -184,7 +183,7 @@ function PieChart({
           </text>
         )}
       </g>
-      <g transform={`rotate(${rotationDeg})`} className="current" style={{ opacity: layerFade }}>
+      <g transform={`rotate(${rotationDeg})`} className="current">
         {currentTasks.map((task, i) => {
           const { start, end, mid } = angles[i]
           const pathD = describeRingArc(
@@ -220,7 +219,7 @@ function PieChart({
         })}
       </g>
       {selectedTask && childTasks.length > 0 && (
-        <g transform={`rotate(${rotationDeg})`} className="children" style={{ opacity: layerFade }}>
+        <g transform={`rotate(${rotationDeg})`} className="children">
           {childTasks.map((task, i) => {
             const { start, end, mid } = childAngles[i]
             const pathD = describeRingArc(0, 0, childRadii.inner, childRadii.outer, start, end)
