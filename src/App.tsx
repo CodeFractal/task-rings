@@ -6,11 +6,16 @@ import './App.css'
 import Modal from './Modal'
 import {
   polarToCartesian,
-  describeArc,
   describeRingArc,
   calculateAngles,
   calculateRotation,
 } from './utils/pie'
+import {
+  useAnimatedNumber,
+  useAnimatedRadii,
+  useRevealOnChange,
+  usePrevious,
+} from './utils/animation'
 
 const VERSION =
   document.querySelector<HTMLMetaElement>('meta[name="build-version"]')?.content ||
@@ -109,46 +114,82 @@ function PieChart({
   onUp: () => void
 }) {
   const isMobile = useIsMobile()
-
-  if (tasks.length === 0) {
-    return <p>No tasks yet</p>
-  }
+  const layerFade = useRevealOnChange(path.join('/'), 1500)
+  const prevPath = usePrevious(path) || path
+  const depthDiff = path.length - prevPath.length
 
   const parentPath = path.slice(0, -1)
   const currentTasks = getTasksAtPath(tasks, parentPath)
   const selectedId = path[path.length - 1] ?? null
   const angles = calculateAngles(currentTasks)
   const selectedIndex = currentTasks.findIndex((t) => t.id === selectedId)
-  const rotation =
+  const targetRotation =
     selectedIndex >= 0 ? calculateRotation(angles[selectedIndex].mid, isMobile) : 0
+  const rotation = useAnimatedNumber(targetRotation, 1500)
   const rotationDeg = (rotation * 180) / Math.PI
   const selectedTask = selectedIndex >= 0 ? currentTasks[selectedIndex] : null
   const childTasks = selectedTask ? selectedTask.subtasks : []
   const childAngles = calculateAngles(childTasks)
-
+  
   const r1 = 70
   const r2 = 100
+  const parentRadius = r1 * 0.4
+
+  const targetParent = parentPath.length > 0 ? parentRadius : 0
+  const targetCurrent = { inner: parentPath.length > 0 ? parentRadius : 0, outer: r1 }
+  const targetChild = { inner: r1 + 5, outer: r2 }
+
+  let fromParent: number | undefined
+  let fromCurrent: { inner: number; outer: number } | undefined
+  let fromChild: { inner: number; outer: number } | undefined
+
+  if (depthDiff > 0) {
+    // drilling in
+    fromParent = r1
+    fromCurrent = { inner: r1 + 5, outer: r2 }
+    fromChild = { inner: r2 + 5, outer: r2 + 10 }
+  } else if (depthDiff < 0) {
+    // moving outward
+    fromParent = 0
+    fromCurrent = { inner: 0, outer: parentRadius }
+    fromChild = { inner: parentRadius, outer: r1 }
+  }
+
+  const currentRadii = useAnimatedRadii(targetCurrent, 1500, fromCurrent)
+
+  const childRadii = useAnimatedRadii(targetChild, 1500, fromChild)
+
+  const animatedParentRadius = useAnimatedNumber(targetParent, 1500, fromParent)
+
+  if (tasks.length === 0) {
+    return <p>No tasks yet</p>
+  }
 
   const parentName = parentPath.length ? getTaskByPath(tasks, parentPath)?.name : ''
 
   return (
     <svg className="pie" viewBox="-110 -110 220 220" width={220} height={220}>
       <g className="parent" onClick={parentPath.length > 0 ? onUp : undefined}>
-        <circle cx={0} cy={0} r={r1 * 0.4} fill="#444" stroke="#000" />
+        <circle cx={0} cy={0} r={animatedParentRadius} fill="#444" stroke="#000" />
         {parentPath.length > 0 && (
           <text x={0} y={0} textAnchor="middle" dominantBaseline="middle">
             {parentName}
           </text>
         )}
       </g>
-      <g transform={`rotate(${rotationDeg})`} className="current">
+      <g transform={`rotate(${rotationDeg})`} className="current" style={{ opacity: layerFade }}>
         {currentTasks.map((task, i) => {
           const { start, end, mid } = angles[i]
-          const pathD = parentPath.length
-            ? describeRingArc(0, 0, r1 * 0.4, r1, start, end)
-            : describeArc(0, 0, r1, start, end)
+          const pathD = describeRingArc(
+            0,
+            0,
+            currentRadii.inner,
+            currentRadii.outer,
+            start,
+            end,
+          )
           const color = task.completed ? '#006400' : '#555'
-          const textRadius = parentPath.length ? (r1 + r1 * 0.4) / 2 : r1 * 0.6
+          const textRadius = (currentRadii.inner + currentRadii.outer) / 2
           const textPos = polarToCartesian(0, 0, textRadius, mid)
           return (
             <g key={task.id} onClick={() => onSelect([...parentPath, task.id])}>
@@ -172,12 +213,12 @@ function PieChart({
         })}
       </g>
       {selectedTask && childTasks.length > 0 && (
-        <g transform={`rotate(${rotationDeg})`} className="children">
+        <g transform={`rotate(${rotationDeg})`} className="children" style={{ opacity: layerFade }}>
           {childTasks.map((task, i) => {
             const { start, end, mid } = childAngles[i]
-            const pathD = describeRingArc(0, 0, r1 + 5, r2, start, end)
+            const pathD = describeRingArc(0, 0, childRadii.inner, childRadii.outer, start, end)
             const color = task.completed ? '#228b22' : '#777'
-            const textPos = polarToCartesian(0, 0, (r1 + r2) / 2, mid)
+            const textPos = polarToCartesian(0, 0, (childRadii.inner + childRadii.outer) / 2, mid)
             return (
               <g key={task.id} onClick={() => onSelect([...path, task.id])}>
                 <path d={pathD} fill={color} stroke="#000" />
