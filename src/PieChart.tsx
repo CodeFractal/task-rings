@@ -58,10 +58,24 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
       {prev && (
         <g transform={`rotate(${prev.rotationDeg})`} style={{ opacity: prev.opacity }}>
           {prev.tasks.map((task, i) => {
-            const { start, end } = prev.angles[i]
+            const { start, end, mid } = prev.angles[i]
             const d = describeRingArc(0, 0, prev.radii.inner, prev.radii.outer, start, end)
             const color = task.completed ? '#006400' : '#555'
-            return <path key={task.id} d={d} fill={color} stroke="#000" />
+            const textRadius = (prev.radii.inner + prev.radii.outer) / 2
+            const pos = polarToCartesian(0, 0, textRadius, mid)
+            return (
+              <g key={task.id}>
+                <path d={d} fill={color} stroke="#000" />
+                <text
+                  x={pos.x}
+                  y={pos.y}
+                  textAnchor="middle"
+                  transform={`rotate(${-prev.rotationDeg} ${pos.x} ${pos.y})`}
+                >
+                  {task.name}
+                </text>
+              </g>
+            )
           })}
         </g>
       )}

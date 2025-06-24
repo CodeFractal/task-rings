@@ -138,7 +138,7 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
     targetPrev = { inner: 0, outer: naturalParent }
   } else if (activeDiff < 0) {
     fromParent = 0
-    fromCurrent = { inner: naturalParent, outer: naturalParent }
+    fromCurrent = { inner: 0, outer: naturalParent }
     fromChild = { inner: naturalParent, outer: r1 }
     prevParentFrom = naturalParent
     prevChildFrom = { inner: r1 + 5, outer: r2 }
