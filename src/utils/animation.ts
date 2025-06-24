@@ -41,6 +41,12 @@ export function useAnimatedNumber(
   const frameRef = useRef<number | undefined>(undefined)
   const startRef = useRef(from ?? value)
 
+  useLayoutEffect(() => {
+    if (from !== undefined) {
+      setAnimated(from)
+    }
+  }, [from])
+
   useEffect(() => {
     startRef.current = from ?? animated
     const start = performance.now()
