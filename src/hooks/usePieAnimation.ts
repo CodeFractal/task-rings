@@ -5,6 +5,7 @@ import {
   useRevealOnChange,
   usePrevious,
 } from '../utils/animation'
+import { useEffect, useRef } from 'react'
 import type { Radii } from '../utils/animation'
 import {
   calculateAngles,
@@ -44,8 +45,18 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   const isMobile = useIsMobile()
   const prevPath = usePrevious(path) || path
   const depthDiff = path.length - prevPath.length
+  const transitionRef = useRef<
+    | {
+        type: 'in' | 'out'
+        prevTasks: Task[]
+        prevAngles: AngleInfo[]
+        prevRotationDeg: number
+        prevChildTasks: Task[]
+        prevChildAngles: AngleInfo[]
+      }
+    | null
+  >(null)
   const fade = useRevealOnChange(path.length, 1500)
-
   const prevParentPath = prevPath.slice(0, -1)
   const prevTasks = getTasksAtPath(tasks, prevParentPath)
   const prevAngles = calculateAngles(prevTasks)
@@ -59,6 +70,34 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   const prevSelectedTask = prevSelectedIndex >= 0 ? prevTasks[prevSelectedIndex] : null
   const prevChildTasks = prevSelectedTask ? prevSelectedTask.subtasks : []
   const prevChildAngles = calculateAngles(prevChildTasks)
+
+  useEffect(() => {
+    if (depthDiff > 0) {
+      transitionRef.current = {
+        type: 'in',
+        prevTasks,
+        prevAngles,
+        prevRotationDeg,
+        prevChildTasks,
+        prevChildAngles,
+      }
+    } else if (depthDiff < 0) {
+      transitionRef.current = {
+        type: 'out',
+        prevTasks,
+        prevAngles,
+        prevRotationDeg,
+        prevChildTasks,
+        prevChildAngles,
+      }
+    }
+  }, [depthDiff, prevTasks, prevAngles, prevRotationDeg, prevChildTasks, prevChildAngles])
+
+  useEffect(() => {
+    if (fade === 1) {
+      transitionRef.current = null
+    }
+  }, [fade])
 
   const parentPath = path.slice(0, -1)
   const currentTasks = getTasksAtPath(tasks, parentPath)
@@ -79,6 +118,9 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   const targetCurrent = { inner: path.length > 0 ? naturalParent : 0, outer: r1 }
   const targetChild = { inner: r1 + 5, outer: r2 }
 
+  const transition = transitionRef.current
+  const activeDiff = transition && fade < 1 ? (transition.type === 'in' ? 1 : -1) : depthDiff
+
   let fromParent: number | undefined
   let fromCurrent: Radii | undefined
   let fromChild: Radii | undefined
@@ -88,13 +130,13 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   let prevChildFrom: Radii | undefined
   let prevChildTo: Radii | undefined
 
-  if (depthDiff > 0) {
+  if (activeDiff > 0) {
     fromParent = r1
     fromCurrent = { inner: r1 + 5, outer: r2 }
     fromChild = { inner: r2 + 5, outer: r2 + 10 }
     fromPrev = { inner: naturalParent, outer: r1 }
     targetPrev = { inner: 0, outer: naturalParent }
-  } else if (depthDiff < 0) {
+  } else if (activeDiff < 0) {
     fromParent = 0
     fromCurrent = { inner: naturalParent, outer: naturalParent }
     fromChild = { inner: naturalParent, outer: r1 }
@@ -110,27 +152,28 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   const prevParentRadius = useAnimatedNumber(r1, 1500, prevParentFrom)
   const prevChildRadii = useAnimatedRadii(prevChildTo ?? { inner: 0, outer: 0 }, 1500, prevChildFrom)
 
-  const parentOpacity = depthDiff !== 0 ? fade : 1
-  const prev: AnimatedLayers['prev'] = depthDiff > 0
-    ? {
-        tasks: prevTasks,
-        angles: prevAngles,
-        radii: prevRadii,
-        rotationDeg: prevRotationDeg,
-        opacity: 1 - fade,
-      }
-    : undefined
+  const parentOpacity = transition ? fade : 1
+  const prev: AnimatedLayers['prev'] =
+    transition?.type === 'in'
+      ? {
+          tasks: transition.prevTasks,
+          angles: transition.prevAngles,
+          radii: prevRadii,
+          rotationDeg: transition.prevRotationDeg,
+          opacity: 1 - fade,
+        }
+      : undefined
   const prevParent =
-    depthDiff < 0 && prevParentFrom !== undefined
+    transition?.type === 'out' && prevParentFrom !== undefined
       ? { radius: prevParentRadius, opacity: 1 - fade }
       : undefined
   const fadingChild =
-    depthDiff < 0 && prevChildFrom
+    transition?.type === 'out' && prevChildFrom
       ? {
-          tasks: prevChildTasks,
-          angles: prevChildAngles,
+          tasks: transition.prevChildTasks,
+          angles: transition.prevChildAngles,
           radii: prevChildRadii,
-          rotationDeg: prevRotationDeg,
+          rotationDeg: transition.prevRotationDeg,
           opacity: 1 - fade,
         }
       : undefined
