@@ -72,8 +72,8 @@ export function useAnimatedNumber(
   return animated
 }
 
-export function useRevealOnChange(
-  trigger: any,
+export function useRevealOnChange<T>(
+  trigger: T,
   duration: number,
   easing: (t: number) => number = easeInOut,
 ): number {

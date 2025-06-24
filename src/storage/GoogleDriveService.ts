@@ -1,5 +1,18 @@
+// External libraries loaded at runtime
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const gapi: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any
+
+interface TokenClient {
+    callback: (response: IAccessTokenResponse) => void
+    requestAccessToken: () => void
+}
+
+interface PickerResponse {
+    action: string
+    docs: { id: string }[]
+}
 
 export class GoogleDriveService {
     private readonly CLIENT_ID = '834406545740-fpa6k2omak75t15u8ve4t7n0t3r1r0ig.apps.googleusercontent.com';
@@ -7,7 +20,7 @@ export class GoogleDriveService {
     private readonly DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
     private readonly SCOPES = 'https://www.googleapis.com/auth/drive';
 
-    private tokenClient: any = null
+    private tokenClient: TokenClient | null = null
     private accessToken: AccessToken | null = null
     private initPromise: Promise<void> | null = null
 
@@ -34,7 +47,7 @@ export class GoogleDriveService {
                             client_id: this.CLIENT_ID,
                             scope: this.SCOPES,
                             callback: () => {},
-                        })
+                        }) as TokenClient
                         resolve()
                     } catch (err) {
                         reject(err)
@@ -125,7 +138,7 @@ export class GoogleDriveService {
                     .addView(folderView)
                     .setOAuthToken(accessToken.token)
                     .setDeveloperKey(this.API_KEY)
-                    .setCallback((data: any) => {
+                    .setCallback((data: PickerResponse) => {
                         if (data.action === google.picker.Action.PICKED) {
                             const folderId = data.docs[0].id;
                             resolve(folderId);
@@ -171,7 +184,7 @@ export class GoogleDriveService {
                     .addView(fileView)
                     .setOAuthToken(accessToken.token)
                     .setDeveloperKey(this.API_KEY)
-                    .setCallback((data: any) => {
+                    .setCallback((data: PickerResponse) => {
                         if (data.action === google.picker.Action.PICKED) {
                             const fileId = data.docs[0].id;
                             resolve(fileId);
@@ -196,33 +209,35 @@ export class GoogleDriveService {
      */
     public async saveAs(fileName: string, folderId: string, content: string, mimeType?: string): Promise<string | null> {
         await this.init()
-        return new Promise(async (resolve) => {
-            const file = new Blob([content], { type: mimeType });
-            let metadata: any = {
-                name: fileName,
-                mimeType: mimeType
-            };
-            if (folderId !== 'root') {
-                metadata.parents = [folderId];
-            }
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            form.append('file', file);
+        return new Promise((resolve) => {
+            ;(async () => {
+                const file = new Blob([content], { type: mimeType });
+                const metadata: { name: string; mimeType?: string; parents?: string[] } = {
+                    name: fileName,
+                    mimeType: mimeType,
+                };
+                if (folderId !== 'root') {
+                    metadata.parents = [folderId];
+                }
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', file);
 
-            const accessToken = await this.getAccessTokenValidFor(20);
-            fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-                method: 'POST',
-                headers: new Headers({ 'Authorization': 'Bearer ' + accessToken.token }),
-                body: form
-            })
-                .then(res => res.json())
-                .then(result => {
-                    resolve(result.id);
+                const accessToken = await this.getAccessTokenValidFor(20);
+                fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+                    method: 'POST',
+                    headers: new Headers({ 'Authorization': 'Bearer ' + accessToken.token }),
+                    body: form
                 })
-                .catch(err => {
-                    console.error("Error creating file:", err);
-                    resolve(null);
-                });
+                    .then(res => res.json())
+                    .then(result => {
+                        resolve(result.id);
+                    })
+                    .catch(err => {
+                        console.error("Error creating file:", err);
+                        resolve(null);
+                    });
+            })()
         });
     }
 
@@ -233,21 +248,23 @@ export class GoogleDriveService {
      */
     public async save(fileId: string, content: string, mimeType?: string): Promise<void> {
         await this.init()
-        return new Promise(async (resolve) => {
-            const accessToken = await this.getAccessTokenValidFor(20)
-            fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-                method: 'PATCH',
-                headers: new Headers({
-                    'Authorization': 'Bearer ' + accessToken.token,
-                    'Content-Type': mimeType || 'text/plain'
-                }),
-                body: content
-            })
-                .then(() => resolve())
-                .catch(err => {
-                    console.error("Error saving file:", err);
-                    resolve();
-                });
+        return new Promise((resolve) => {
+            ;(async () => {
+                const accessToken = await this.getAccessTokenValidFor(20)
+                fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+                    method: 'PATCH',
+                    headers: new Headers({
+                        'Authorization': 'Bearer ' + accessToken.token,
+                        'Content-Type': mimeType || 'text/plain'
+                    }),
+                    body: content
+                })
+                    .then(() => resolve())
+                    .catch(err => {
+                        console.error("Error saving file:", err);
+                        resolve();
+                    });
+            })()
         });
     }
 
@@ -258,17 +275,19 @@ export class GoogleDriveService {
      */
     public async open(fileId: string): Promise<string | null> {
         await this.init()
-        return new Promise(async (resolve) => {
-            const accessToken = await this.getAccessTokenValidFor(20)
-            fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-                headers: new Headers({ 'Authorization': 'Bearer ' + accessToken.token })
-            })
-                .then(res => res.text())
-                .then(content => resolve(content))
-                .catch(err => {
-                    console.error("Error opening file:", err);
-                    resolve(null);
-                });
+        return new Promise((resolve) => {
+            ;(async () => {
+                const accessToken = await this.getAccessTokenValidFor(20)
+                fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                    headers: new Headers({ 'Authorization': 'Bearer ' + accessToken.token })
+                })
+                    .then(res => res.text())
+                    .then(content => resolve(content))
+                    .catch(err => {
+                        console.error("Error opening file:", err);
+                        resolve(null);
+                    });
+            })()
         });
     }
 }
