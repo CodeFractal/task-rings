@@ -5,7 +5,7 @@ import {
   useRevealOnChange,
   usePrevious,
 } from '../utils/animation'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import type { Radii } from '../utils/animation'
 import {
   calculateAngles,
@@ -71,33 +71,18 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   const prevChildTasks = prevSelectedTask ? prevSelectedTask.subtasks : []
   const prevChildAngles = calculateAngles(prevChildTasks)
 
-  useEffect(() => {
-    if (depthDiff > 0) {
-      transitionRef.current = {
-        type: 'in',
-        prevTasks,
-        prevAngles,
-        prevRotationDeg,
-        prevChildTasks,
-        prevChildAngles,
-      }
-    } else if (depthDiff < 0) {
-      transitionRef.current = {
-        type: 'out',
-        prevTasks,
-        prevAngles,
-        prevRotationDeg,
-        prevChildTasks,
-        prevChildAngles,
-      }
+  if (!transitionRef.current && depthDiff !== 0) {
+    transitionRef.current = {
+      type: depthDiff > 0 ? 'in' : 'out',
+      prevTasks,
+      prevAngles,
+      prevRotationDeg,
+      prevChildTasks,
+      prevChildAngles,
     }
-  }, [depthDiff, prevTasks, prevAngles, prevRotationDeg, prevChildTasks, prevChildAngles])
-
-  useEffect(() => {
-    if (fade === 1) {
-      transitionRef.current = null
-    }
-  }, [fade])
+  } else if (transitionRef.current && fade === 1) {
+    transitionRef.current = null
+  }
 
   const parentPath = path.slice(0, -1)
   const currentTasks = getTasksAtPath(tasks, parentPath)
