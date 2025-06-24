@@ -118,6 +118,19 @@ function PieChart({
   const depthDiff = path.length - prevPath.length
   const parentFadeRaw = useRevealOnChange(path.length, 1500)
 
+  const prevParentPath = prevPath.slice(0, -1)
+  const prevCurrentTasks = getTasksAtPath(tasks, prevParentPath)
+  const prevAngles = calculateAngles(prevCurrentTasks)
+  const prevSelectedId = prevPath[prevPath.length - 1] ?? null
+  const prevSelectedIndex = prevCurrentTasks.findIndex(
+    (t) => t.id === prevSelectedId,
+  )
+  const prevRotationDeg =
+    (prevSelectedIndex >= 0
+      ? (calculateRotation(prevAngles[prevSelectedIndex].mid, isMobile) * 180) /
+        Math.PI
+      : 0)
+
   const parentPath = path.slice(0, -1)
   const currentTasks = getTasksAtPath(tasks, parentPath)
   const selectedId = path[path.length - 1] ?? null
@@ -142,12 +155,16 @@ function PieChart({
   let fromParent: number | undefined
   let fromCurrent: { inner: number; outer: number } | undefined
   let fromChild: { inner: number; outer: number } | undefined
+  let fromPrevRing: { inner: number; outer: number } | undefined
+  let targetPrevRing: { inner: number; outer: number } = { inner: 0, outer: 0 }
 
   if (depthDiff > 0) {
     // drilling in
     fromParent = r1
     fromCurrent = { inner: r1 + 5, outer: r2 }
     fromChild = { inner: r2 + 5, outer: r2 + 10 }
+    fromPrevRing = { inner: parentRadius, outer: r1 }
+    targetPrevRing = { inner: 0, outer: parentRadius }
   } else if (depthDiff < 0) {
     // moving outward
     fromParent = 0
@@ -156,6 +173,8 @@ function PieChart({
   }
 
   const currentRadii = useAnimatedRadii(targetCurrent, 1500, fromCurrent)
+
+  const prevRingRadii = useAnimatedRadii(targetPrevRing, 1500, fromPrevRing)
 
   const childRadii = useAnimatedRadii(targetChild, 1500, fromChild)
 
@@ -183,6 +202,23 @@ function PieChart({
           </text>
         )}
       </g>
+      {depthDiff > 0 && (
+        <g transform={`rotate(${prevRotationDeg})`} style={{ opacity: 1 - parentFadeRaw }}>
+          {prevCurrentTasks.map((task, i) => {
+            const { start, end } = prevAngles[i]
+            const pathD = describeRingArc(
+              0,
+              0,
+              prevRingRadii.inner,
+              prevRingRadii.outer,
+              start,
+              end,
+            )
+            const color = task.completed ? '#006400' : '#555'
+            return <path key={task.id} d={pathD} fill={color} stroke="#000" />
+          })}
+        </g>
+      )}
       <g transform={`rotate(${rotationDeg})`} className="current">
         {currentTasks.map((task, i) => {
           const { start, end, mid } = angles[i]
