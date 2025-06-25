@@ -3,6 +3,8 @@ import {
   polarToCartesian,
   calculateAngles,
   calculateRotation,
+  scaleAngles,
+  interpolateAngles,
   describeRingArc,
 } from './pie'
 
@@ -36,12 +38,12 @@ describe('calculateAngles', () => {
 
 describe('calculateRotation', () => {
   it('rotates for desktop', () => {
-    const rot = calculateRotation(Math.PI / 4, false)
+    const rot = calculateRotation(Math.PI / 4)
     expect(rot).toBeCloseTo(-Math.PI / 4)
   })
   it('rotates for mobile', () => {
-    const rot = calculateRotation(Math.PI / 4, true)
-    expect(rot).toBeCloseTo(-Math.PI / 2 - Math.PI / 4)
+    const rot = calculateRotation(Math.PI / 4)
+    expect(rot).toBeCloseTo(-Math.PI / 4)
   })
 })
 
@@ -50,5 +52,39 @@ describe('describeRingArc', () => {
     const path = describeRingArc(0, 0, 1, 2, 0, Math.PI)
     expect(path.startsWith('M')).toBe(true)
     expect(path.endsWith('Z')).toBe(true)
+  })
+})
+
+describe('scaleAngles', () => {
+  it('maps angles to a new range', () => {
+    const original = calculateAngles([
+      { effort: 1 },
+      { effort: 1 },
+    ])
+    const start = Math.PI / 2
+    const end = Math.PI
+    const scaled = scaleAngles(original, start, end)
+    expect(scaled[0].start).toBeCloseTo(start)
+    expect(scaled[0].end).toBeCloseTo(start + (end - start) / 2)
+    expect(scaled[1].start).toBeCloseTo(start + (end - start) / 2)
+    expect(scaled[1].end).toBeCloseTo(end)
+  })
+})
+
+describe('interpolateAngles', () => {
+  it('blends between angle sets', () => {
+    const from = [
+      { start: 0, end: Math.PI / 2, mid: Math.PI / 4 },
+      { start: Math.PI / 2, end: Math.PI, mid: (3 * Math.PI) / 4 },
+    ]
+    const to = [
+      { start: 0, end: Math.PI, mid: Math.PI / 2 },
+      { start: Math.PI, end: Math.PI * 2, mid: (3 * Math.PI) / 2 },
+    ]
+    const blended = interpolateAngles(from, to, 0.5)
+    expect(blended[0].start).toBeCloseTo(0)
+    expect(blended[0].end).toBeCloseTo((Math.PI / 2 + Math.PI) / 2)
+    expect(blended[1].start).toBeCloseTo((Math.PI / 2 + Math.PI) / 2)
+    expect(blended[1].end).toBeCloseTo((Math.PI + Math.PI * 2) / 2)
   })
 })

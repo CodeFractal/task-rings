@@ -1,7 +1,14 @@
-import { polarToCartesian, describeRingArc, calculateAngles } from './utils/pie'
+import {
+  polarToCartesian,
+  describeRingArc,
+  calculateAngles,
+  scaleAngles,
+  interpolateAngles,
+} from './utils/pie'
 import { getTasksAtPath, getTaskByPath } from './utils/tasks'
 import type { Task } from './types'
 import { usePieAnimation } from './hooks/usePieAnimation'
+import { usePrevious, useRevealOnChange } from './utils/animation'
 
 interface Props {
   tasks: Task[]
@@ -22,13 +29,27 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
     fadingChild,
   } = usePieAnimation(tasks, path)
 
+  const prevPath = usePrevious(path) || path
+  const fade = useRevealOnChange(path.length, 1500)
+  const depthDiff = path.length - prevPath.length
+
   const parentPath = path.slice(0, -1)
   const currentTasks = getTasksAtPath(tasks, parentPath)
   const angles = calculateAngles(currentTasks)
   const selectedId = path[path.length - 1] ?? null
-  const selectedTask = currentTasks.find((t) => t.id === selectedId) || null
+  const selectedIndex = currentTasks.findIndex((t) => t.id === selectedId)
+  const selectedTask = selectedIndex >= 0 ? currentTasks[selectedIndex] : null
   const childTasks = selectedTask ? selectedTask.subtasks : []
-  const childAngles = calculateAngles(childTasks)
+  let childAngles: ReturnType<typeof calculateAngles> = []
+  if (selectedTask && childTasks.length > 0) {
+    const base = calculateAngles(childTasks)
+    const scaled = scaleAngles(
+      base,
+      angles[selectedIndex].start,
+      angles[selectedIndex].end,
+    )
+    childAngles = depthDiff > 0 ? interpolateAngles(scaled, base, fade) : scaled
+  }
   const parentName = parentPath.length ? getTaskByPath(tasks, parentPath)?.name : ''
 
   return (
@@ -112,7 +133,7 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
           {childTasks.map((task, i) => {
             const { start, end, mid } = childAngles[i]
             const d = describeRingArc(0, 0, child.inner, child.outer, start, end)
-            const color = task.completed ? '#228b22' : '#777'
+            const color = task.completed ? '#006400' : '#555'
             const pos = polarToCartesian(0, 0, (child.inner + child.outer) / 2, mid)
             return (
               <g key={task.id} onClick={() => onSelect([...path, task.id])}>
@@ -135,7 +156,7 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
           {fadingChild.tasks.map((task, i) => {
             const { start, end } = fadingChild.angles[i]
             const d = describeRingArc(0, 0, fadingChild.radii.inner, fadingChild.radii.outer, start, end)
-            const color = task.completed ? '#228b22' : '#777'
+            const color = task.completed ? '#006400' : '#555'
             return <path key={task.id} d={d} fill={color} stroke="#000" />
           })}
         </g>
