@@ -72,7 +72,36 @@ export function calculateAngles<T extends TaskLike>(tasks: T[]): AngleInfo[] {
   })
 }
 
-export function calculateRotation(midAngle: number, isMobile: boolean): number {
-  const target = isMobile ? -Math.PI / 2 : 0
-  return target - midAngle
+export function calculateRotation(midAngle: number): number {
+  // Rotate so the selected slice points to the right on all devices
+  return -midAngle
+}
+
+export function scaleAngles(
+  angles: AngleInfo[],
+  start: number,
+  end: number,
+): AngleInfo[] {
+  const span = end - start
+  const full = Math.PI * 2
+  return angles.map((a) => ({
+    start: start + (a.start / full) * span,
+    end: start + (a.end / full) * span,
+    mid: start + (a.mid / full) * span,
+  }))
+}
+
+export function interpolateAngles(
+  from: AngleInfo[],
+  to: AngleInfo[],
+  t: number,
+): AngleInfo[] {
+  return from.map((f, i) => {
+    const target = to[i]
+    return {
+      start: f.start + (target.start - f.start) * t,
+      end: f.end + (target.end - f.end) * t,
+      mid: f.mid + (target.mid - f.mid) * t,
+    }
+  })
 }

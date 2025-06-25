@@ -92,8 +92,7 @@
 }
 
 .pie path.selected {
-  stroke: yellow;
-  stroke-width: 3;
+  filter: brightness(1.4);
 }
 
 @media (max-width: 600px) {

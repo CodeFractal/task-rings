@@ -79,12 +79,13 @@ export class GoogleDriveService {
     public async signIn(): Promise<boolean> {
         await this.init()
         return new Promise((resolve, reject) => {
-            if (!this.tokenClient) {
+            const tokenClient = this.tokenClient;
+            if (!tokenClient) {
                 return reject(new Error('Token client not initialized.'))
             }
             // Temporarily override the callback for this sign-in attempt.
-            const originalCallback = this.tokenClient.callback;
-            this.tokenClient.callback = (response: IAccessTokenResponse) => {
+            const originalCallback = tokenClient.callback;
+            tokenClient.callback = (response: IAccessTokenResponse) => {
                 if (response.error) {
                     console.error("Sign-in error:", response.error);
                     resolve(false);
@@ -95,9 +96,9 @@ export class GoogleDriveService {
                     resolve(true);
                 }
                 // Restore the original callback.
-                this.tokenClient.callback = originalCallback;
+                tokenClient.callback = originalCallback;
             };
-            this.tokenClient.requestAccessToken();
+            tokenClient.requestAccessToken();
         });
     }
 
