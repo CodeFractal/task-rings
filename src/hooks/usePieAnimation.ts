@@ -1,4 +1,3 @@
-import { useIsMobile } from '../utils/useIsMobile'
 import {
   useAnimatedNumber,
   useAnimatedRadii,
@@ -42,7 +41,6 @@ export interface AnimatedLayers {
 }
 
 export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
-  const isMobile = useIsMobile()
   const prevPath = usePrevious(path) || path
   const depthDiff = path.length - prevPath.length
   const transitionRef = useRef<
@@ -64,12 +62,23 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   const prevSelectedIndex = prevTasks.findIndex((t) => t.id === prevSelectedId)
   const prevRotationDeg =
     prevSelectedIndex >= 0
-      ? (calculateRotation(prevAngles[prevSelectedIndex].mid, isMobile) * 180) /
-        Math.PI
+      ? (calculateRotation(prevAngles[prevSelectedIndex].mid) * 180) / Math.PI
       : 0
   const prevSelectedTask = prevSelectedIndex >= 0 ? prevTasks[prevSelectedIndex] : null
   const prevChildTasks = prevSelectedTask ? prevSelectedTask.subtasks : []
-  const prevChildAngles = calculateAngles(prevChildTasks)
+  const prevBaseChildAngles = calculateAngles(prevChildTasks)
+  const prevChildAngles = prevSelectedTask
+    ? prevBaseChildAngles.map((a) => {
+        const parent = prevAngles[prevSelectedIndex]
+        const span = parent.end - parent.start
+        const scale = span / (Math.PI * 2)
+        return {
+          start: parent.start + a.start * scale,
+          end: parent.start + a.end * scale,
+          mid: parent.start + a.mid * scale,
+        }
+      })
+    : []
 
   if (!transitionRef.current && depthDiff !== 0) {
     transitionRef.current = {
@@ -90,7 +99,7 @@ export function usePieAnimation(tasks: Task[], path: number[]): AnimatedLayers {
   const angles = calculateAngles(currentTasks)
   const selectedIndex = currentTasks.findIndex((t) => t.id === selectedId)
   const targetRotation =
-    selectedIndex >= 0 ? calculateRotation(angles[selectedIndex].mid, isMobile) : 0
+    selectedIndex >= 0 ? calculateRotation(angles[selectedIndex].mid) : 0
 
   const rotationDeg =
     (useAnimatedNumber(targetRotation, 1500) * 180) / Math.PI

@@ -27,8 +27,21 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
   const angles = calculateAngles(currentTasks)
   const selectedId = path[path.length - 1] ?? null
   const selectedTask = currentTasks.find((t) => t.id === selectedId) || null
+  const selectedIndex = currentTasks.findIndex((t) => t.id === selectedId)
   const childTasks = selectedTask ? selectedTask.subtasks : []
-  const childAngles = calculateAngles(childTasks)
+  const baseChildAngles = calculateAngles(childTasks)
+  const childAngles = selectedTask
+    ? baseChildAngles.map((a) => {
+        const parent = angles[selectedIndex]
+        const span = parent.end - parent.start
+        const scale = span / (Math.PI * 2)
+        return {
+          start: parent.start + a.start * scale,
+          end: parent.start + a.end * scale,
+          mid: parent.start + a.mid * scale,
+        }
+      })
+    : []
   const parentName = parentPath.length ? getTaskByPath(tasks, parentPath)?.name : ''
 
   return (
@@ -112,7 +125,7 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
           {childTasks.map((task, i) => {
             const { start, end, mid } = childAngles[i]
             const d = describeRingArc(0, 0, child.inner, child.outer, start, end)
-            const color = task.completed ? '#228b22' : '#777'
+            const color = task.completed ? '#006400' : '#555'
             const pos = polarToCartesian(0, 0, (child.inner + child.outer) / 2, mid)
             return (
               <g key={task.id} onClick={() => onSelect([...path, task.id])}>
@@ -135,7 +148,7 @@ export function PieChart({ tasks, path, onSelect, onUp }: Props) {
           {fadingChild.tasks.map((task, i) => {
             const { start, end } = fadingChild.angles[i]
             const d = describeRingArc(0, 0, fadingChild.radii.inner, fadingChild.radii.outer, start, end)
-            const color = task.completed ? '#228b22' : '#777'
+            const color = task.completed ? '#006400' : '#555'
             return <path key={task.id} d={d} fill={color} stroke="#000" />
           })}
         </g>

@@ -72,7 +72,7 @@ export function calculateAngles<T extends TaskLike>(tasks: T[]): AngleInfo[] {
   })
 }
 
-export function calculateRotation(midAngle: number, isMobile: boolean): number {
-  const target = isMobile ? -Math.PI / 2 : 0
-  return target - midAngle
+export function calculateRotation(midAngle: number): number {
+  // Always rotate the selected segment to the right side of the pie
+  return -midAngle
 }
