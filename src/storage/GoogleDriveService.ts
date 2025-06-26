@@ -95,9 +95,9 @@ export class GoogleDriveService {
                     resolve(true);
                 }
                 // Restore the original callback.
-                this.tokenClient.callback = originalCallback;
+                this.tokenClient!.callback = originalCallback;
             };
-            this.tokenClient.requestAccessToken();
+            this.tokenClient!.requestAccessToken();
         });
     }
 

@@ -35,13 +35,9 @@ describe('calculateAngles', () => {
 })
 
 describe('calculateRotation', () => {
-  it('rotates for desktop', () => {
-    const rot = calculateRotation(Math.PI / 4, false)
+  it('rotates selected slice to the right', () => {
+    const rot = calculateRotation(Math.PI / 4)
     expect(rot).toBeCloseTo(-Math.PI / 4)
-  })
-  it('rotates for mobile', () => {
-    const rot = calculateRotation(Math.PI / 4, true)
-    expect(rot).toBeCloseTo(-Math.PI / 2 - Math.PI / 4)
   })
 })
 
